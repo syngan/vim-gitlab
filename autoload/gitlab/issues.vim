@@ -20,21 +20,20 @@ function! s:Issues.initialize(site, user, repos)
 endfunction
 
 function! s:Issues.get(number)
-  return self.issues[a:number - 1]
-  " let left = 0
-  " let right = len(self.issues) - 1
-  " while left <= right
-  "   let mid = (left + right) / 2
-  "   " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
-  "   if self.issues[mid].id < a:number
-  "     let left = mid + 1
-  "   elseif self.issues[mid].id > a:number
-  "     let right = mid - 1
-  "   else
-  "     return self.issues[mid]
-  "   endif
-  " endwhile
-  " return self.issues[left]
+  let left = 0
+  let right = len(self.issues) - 1
+  while left <= right
+    let mid = (left + right) / 2
+    " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
+    if self.issues[mid].iid < a:number
+      let left = mid + 1
+    elseif self.issues[mid].iid > a:number
+      let right = mid - 1
+    else
+      return self.issues[mid]
+    endif
+  endwhile
+  return self.issues[left]
 endfunction
 
 function! s:Issues.list()
@@ -75,7 +74,7 @@ function! s:Issues.update_issue(number, title, body)
   let res = self.connect('patch', 'issues', string(0 + a:number), {'title': a:title, 'body': a:body})
   let res.comments = self.get(a:number).comments
 "  let self.get(a:number) = res
-  let self.issues[a:number - 1] = res
+  let self.issues.rev_index[a:number] = res
 endfunction
 
 function! s:Issues.add_comment(number, comment)
@@ -130,7 +129,7 @@ function! s:Issues.close(number)
 endfunction
 
 function! s:Issues.reopen(number)
-  let self.issues[a:number - 1] = self.connect('patch', 'issues', string(0 + a:number), {'state': 'open'})
+  let self.issues[a:number - 1] = self.connect('patch', 'issues', string(0 + a:number), {'state': 'opened'})
 endfunction
 
 function! s:Issues.connect(method, url, data, is_pagelist)
@@ -169,6 +168,9 @@ endfunction
 function! s:normalize_issue(issue, key)
   if !has_key(a:issue, 'id')
     let a:issue.id = -1
+  endif
+  if !has_key(a:issue, 'iid')
+    let a:issue.iid = -1
   endif
   if !has_key(a:issue, 'title')
     let a:issue.title = "NO TITLE"
@@ -226,7 +228,7 @@ echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
   let length = len(self.issue_list)
   let self.rev_index = {}
   for i in range(length)
-    let self.rev_index[list[i].id] = i
+    let self.rev_index[list[i].iid] = i
   endfor
   echomsg "gitlab#issues update_issue_list() end"
 endfunction
@@ -270,7 +272,7 @@ function! s:UI.view_issue()
   let self.issue = self.issues.get(self.number)
   let w:gitlab_issues_last_opened = self.number
 
-  return ['[[edit]] ' . (self.issue.state ==# 'open' ?
+  return ['[[edit]] ' . (self.issue.state ==# 'opened' ?
   \       '[[close]]' : '[[reopen]]')] + self.issue_layout(self.issue)
 endfunction
 
@@ -280,7 +282,7 @@ function! s:UI.edit_issue()
     let [title, labels, body] = ['', [], '']
   else
     let i = self.issues.get(self.number)
-    let [title, labels, body] = [i.title, i.labels, i.body]
+    let [title, labels, body] = [i.title, i.labels, i.description]
     let text += ['number: ' . self.number]
   endif
   let text += ['title: ' . title]
@@ -293,8 +295,11 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  return printf('%3d: %-6s| %s%s', a:issue.number, a:issue.state,
-  \      join(map(copy(a:issue.labels), '"[". v:val.name ."]"'), ''),
+  echo a:issue.labels
+  return printf('%3d: %-6s| %s%s',
+        \ a:issue.iid,
+        \ a:issue.state,
+  \      join(map(copy(a:issue.labels), '"[". v:val ."]"'), ''),
   \      substitute(a:issue.title, '\n', '', 'g'))
 endfunction
 
@@ -303,7 +308,7 @@ call vimconsole#log("gitlab#issues layout()")
 call vimconsole#log(a:issue)
   let i = a:issue
   let lines = [
-  \ i.number. ': ' . i.title,
+  \ i.iid . ': ' . i.title,
   \ 'user: ' . i.author.username,
   \ 'labels: ' . join(map(copy(i.labels), 'v:val.name'), ', '),
   \ 'created: ' . i.created_at,
@@ -461,7 +466,7 @@ function! s:UI.reload()
 endfunction
 
 function! s:UI.move(cnt)
-  let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.id]
+  let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.iid]
   \                                 : -1) + a:cnt
   let length = len(self.issue_list)
   if idx == -2  " <C-k> in issue list.
