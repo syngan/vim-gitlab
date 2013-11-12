@@ -6,17 +6,16 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-
 " Keep the issues.
 let s:repos = {}
 
-
 " Issues object  {{{1
-let s:Issues = github#base()
+let s:Issues = gitlab#base()
 let s:Issues.name = 'issues'
 
-function! s:Issues.initialize(user, repos)
-  let [self.user, self.repos] = [a:user, a:repos]
+function! s:Issues.initialize(site, user, repos)
+  echo "@@@@ called initialize!"
+  let [self.site, self.user, self.repos] = [a:site, a:user, a:repos]
   let self.issues = []  " issues: Always sorted by issue number.
 endfunction
 
@@ -33,11 +32,19 @@ function! s:Issues.comment_count(number)
   return type(comments) == type(0) ? comments : len(comments)
 endfunction
 
-function! s:get_issue_all(self, state)
+function! s:get_issue_all(self)
+  " state=open/...
   let issues = []
   let page = 1
+  let token = a:self.get_token()
+  let proj_id = gitlabapi#project_id(token, a:self.user, a:self.repos)
+  echo "proj.id=" . proj_id
+  if proj_id < 0
+    throw "project not found: " . a:self.user . "/" . a:self.repos
+  endif
+
   while 1
-    let data = a:self.connect('get', 'issues', {'state': a:state, 'page': page, 'per_page': 100})
+    let data = gitlabapi#issues(token, page, 100, proj_id)
     let issues += data
     if len(data) < 100
       break
@@ -48,12 +55,17 @@ function! s:get_issue_all(self, state)
 endfunction
 
 function! s:Issues.update_list()
-  let open = s:get_issue_all(self, 'open')
-  let closed = s:get_issue_all(self, 'closed')
+  let open = s:get_issue_all(self)
+  call map(open, 's:normalize_issue(v:val)')
+  let self.issues = sort(open, s:func('order_by_number'))
 
-  let self.issues = sort(open + closed,
-  \                      s:func('order_by_number'))
-  call map(self.issues, 's:normalize_issue(v:val)')
+  echo ">>> issues: "
+  for iss in self.issues
+    echo iss.id . "," . iss.state . "," . iss.title
+  endfor
+  echo self.issues[-2]
+  echo "<<< issues"
+
 endfunction
 
 function! s:Issues.create_new_issue(title, body)
@@ -119,28 +131,31 @@ function! s:Issues.reopen(number)
 endfunction
 
 function! s:Issues.connect(method, action, ...)
-  let res = github#connect(a:method, '/repos', self.user, self.repos, a:action, a:000, 0)
+  let res = gitlab#connect(a:method, '/repos', self.user, self.repos, a:action, a:000, 0)
   if type(res) == type({})
     if has_key(res, 'error')
-      throw 'github: issues: API error: ' . res.error
+      throw 'gitlab: issues: API error: ' . res.error
     elseif get(res, 'message', '') ==# 'Bad credentials'
-      throw 'github: issues: API error: Bad credentials'
+      throw 'gitlab: issues: API error: Bad credentials'
     endif
   endif
   return res
 endfunction
 
 function! s:normalize_issue(issue)
-  if a:issue.comments is 0
-    let a:issue.comments = []
+  if !has_key(a:issue, 'id')
+    let a:issue.id = -1
+  endif
+  if !has_key(a:issue, 'title')
+    let a:issue.title = "NO TITLE"
   endif
   return a:issue
 endfunction
 
-function! s:get_issue(user, repos)
+function! s:get_issue(site, user, repos)
   let key = a:user . '/' . a:repos
   if !has_key(s:repos, key)
-    let issues = s:Issues.new(a:user, a:repos)
+    let issues = s:Issues.new(a:site, a:user, a:repos)
     call issues.update_list()
     let s:repos[key] = issues
   endif
@@ -151,14 +166,15 @@ endfunction
 " UI object  {{{1
 let s:UI = {'name': 'issues'}
 
-function! s:UI.initialize(path)
-echomsg "github#issues iniaialize() start"
-  let pathinfo = github#parse_path(a:path, '/:user/:repos/\?::path')
+function! s:UI.initialize(site, path)
+echomsg "gitlab#issues iniaialize() start: " . a:path
+  let pathinfo = gitlab#parse_path(a:path, '/:user/:repos/\?::path')
   if empty(pathinfo)
-    throw 'github: issues: Require the repository name.'
+    throw 'gitlab: issues: Require the repository name.'
   endif
 
   let path = pathinfo.path
+  let self.site = a:site
   let self.path = split(pathinfo.path, '/')
   let self.type =
   \   get(self.path, -1, '') =~# '^\%(edit\|new\)$' ? 'edit' : 'view'
@@ -172,44 +188,44 @@ echomsg "github#issues iniaialize() start"
   " number: 0 = list, 'new' = new, 1 or more = id
   let self.number = get(self.path, 0, 0)
 
-  let self.issues = s:get_issue(pathinfo.user, pathinfo.repos)
+  let self.issues = s:get_issue(a:site, pathinfo.user, pathinfo.repos)
   call self.update_issue_list()
-  echomsg "github#issues iniaialize() end"
+  echomsg "gitlab#issues iniaialize() end"
 endfunction
 
 function! s:UI.update_issue_list()
   " Save the sorted list
-echomsg "github#issues update_issue_list() start"
+echomsg "gitlab#issues update_issue_list() start"
   let list = sort(self.issues.list(), s:func('compare_list'))
   let self.issue_list = list
   let length = len(self.issue_list)
   let self.rev_index = {}
   for i in range(length)
-    let self.rev_index[list[i].number - 1] = i
+    let self.rev_index[list[i].id - 1] = i
   endfor
-  echomsg "github#issues update_issue_list() end"
+  echomsg "gitlab#issues update_issue_list() end"
 endfunction
 
 function! s:UI.open(...)
   let base = [self.name, self.issues.user, self.issues.repos]
- 
+
 echomsg "ui.open() flatten"
-  let args = github#flatten(a:000)
-  let path = printf('github://%s', join(base + args, '/'))
+  let args = gitlab#flatten(a:000)
+  let path = printf('gitlab://%s/%s', self.site, join(base + args, '/'))
 echomsg "ui.open() edit: path=" . path
   let edit = get(args, -1, '') =~# '^\%(edit\|new\)$'
 echomsg "ui.open() opener: edit=" . edit
   " TODO: Opener is made customizable.
-  let opener = edit || &l:filetype !=# 'github-issues' ? 'new' : 'edit'
+  let opener = edit || &l:filetype !=# 'gitlab-issues' ? 'new' : 'edit'
   execute opener '`=path`'
 echomsg "ui.open() opner=" . opener
 endfunction
 
 function! s:UI.updated()
   if self.type ==# 'view' && self.mode ==# 'list'
-    if exists('w:github_issues_last_opened')
-      call search('^\s*' . w:github_issues_last_opened . ':', 'w')
-      unlet w:github_issues_last_opened
+    if exists('w:gitlab_issues_last_opened')
+      call search('^\s*' . w:gitlab_issues_last_opened . ':', 'w')
+      unlet w:gitlab_issues_last_opened
     endif
   endif
 endfunction
@@ -227,7 +243,7 @@ function! s:UI.view_issue()
   call self.issues.fetch_comments(self.number)
 
   let self.issue = self.issues.get(self.number)
-  let w:github_issues_last_opened = self.number
+  let w:gitlab_issues_last_opened = self.number
 
   return ['[[edit]] ' . (self.issue.state ==# 'open' ?
   \       '[[close]]' : '[[reopen]]')] + self.issue_layout(self.issue)
@@ -252,13 +268,13 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  return printf('%3d: %-6s| %s%s', a:issue.number, a:issue.state,
+  return printf('%3d: %-6s| %s%s', a:issue.id, a:issue.state,
   \      join(map(copy(a:issue.labels), '"[". v:val.name ."]"'), ''),
   \      substitute(a:issue.title, '\n', '', 'g'))
 endfunction
 
 function! s:UI.issue_layout(issue)
-echomsg "github#issues layout()"
+echomsg "gitlab#issues layout()"
   let i = a:issue
   let lines = [
   \ i.number . ': ' . i.title,
@@ -297,10 +313,10 @@ endfunction
 
 " Control.  {{{1
 function! s:UI.action()
-echomsg "github#issues action()"
+echomsg "gitlab#issues action() " . has_key(self, "site")
   try
-    call self.perform(github#get_text_on_cursor('\[\[.\{-}\]\]'))
-  catch /^github:/
+    call self.perform(gitlab#get_text_on_cursor('\[\[.\{-}\]\]'))
+  catch /^gitlab:/
     echohl ErrorMsg
     echomsg v:exception
     echohl None
@@ -308,13 +324,14 @@ echomsg "github#issues action()"
 endfunction
 
 function! s:UI.perform(button)
-echomsg "github#issues perform()"
+echomsg "gitlab#issues perform()" . has_key(self, "site")
   let button = a:button
   if self.mode ==# 'list'
     if button ==# '[[new issue]]'
       call self.open('new')
     else
       let number = matchstr(getline('.'), '^\s*\zs\d\+\ze\s*:')
+      echo "number=" . number
       if number =~ '^\d\+$'
         call self.open(number)
       endif
@@ -338,17 +355,17 @@ echomsg "github#issues perform()"
         1
         let bodystart = search('^\cbody:', 'n')
         if !bodystart
-          throw 'github: issues: No body.'
+          throw 'gitlab: issues: No body.'
         endif
         let body = join(getline(bodystart + 1, '$'), "\n")
 
         let titleline = search('^\ctitle:', 'Wn', bodystart)
         if !titleline
-          throw 'github: issues: No title.'
+          throw 'gitlab: issues: No title.'
         endif
         let title = matchstr(getline(titleline), '^\w\+:\s*\zs.\{-}\ze\s*$')
         if title == ''
-          throw 'github: issues: Title is empty.'
+          throw 'gitlab: issues: Title is empty.'
         endif
 
         let labelsline = search('^\clabels:', 'Wn', bodystart)
@@ -384,7 +401,7 @@ echomsg "github#issues perform()"
         1
         let commentstart = search('^\ccomment:', 'n')
         if !commentstart
-          throw 'github: issues: No comment.'
+          throw 'gitlab: issues: No comment.'
         endif
         let comment = join(getline(commentstart + 1, '$'), "\n")
 
@@ -446,21 +463,22 @@ echomsg "read()"
 endfunction
 
 
-function! s:UI.invoke(args)
+function! s:UI.invoke(site, args)
   if empty(a:args)
-    throw 'github: issues: Require the repository name.'
+    throw 'gitlab: issues: Require the repository name.'
   endif
   let repos = a:args[0]
   let path = repos =~# '/' ? split(repos, '/')[0 : 1]
-  \                        : [g:github#user, repos]
+  \                        : [g:gitlab#user, repos]
   if 2 <= len(a:args)
     call add(path, a:args[1])
   endif
 
-  echo self
+  echo path
  echomsg "invoke . call new"
-  let ui = self.new('/' . join(path, '/'))
+  let ui = self.new(a:site, '/' . join(path, '/'))
  echomsg "invoke . call open"
+  let ui.site = a:site
   call ui.open(path[2 :])
  echomsg "invoke . end"
 endfunction
@@ -468,15 +486,16 @@ endfunction
 
 " Misc.  {{{1
 function! s:order_by_number(a, b)
-  return a:a.number - a:b.number
+  return a:a.id - a:b.id
 endfunction
 
 function! s:compare_list(a, b)
   " TODO: Be made customizable.
-  if a:a.state !=# a:b.state
-    return a:a.state ==# 'open' ? -1 : 1
+  if a:a.state ==# a:b.state
+    return a:a.id - a:b.id
+  else
+    return a:a.state ==# 'opened' ? -1 : 1
   endif
-  return a:a.number - a:b.number
 endfunction
 
 function! s:list_sub(a, b)
@@ -491,15 +510,15 @@ function! s:func(name)
   return function(matchstr(expand('<sfile>'), '<SNR>\d\+_\zefunc$') . a:name)
 endfunction
 
-function! github#issues#new()
+function! gitlab#issues#new()
   return copy(s:UI)
 endfunction
 
-function! github#issues#complete(lead, cmd, pos)
+function! gitlab#issues#complete(lead, cmd, pos)
   let token = split(a:cmd, '\s\+')
   let ntoken = len(token)
   if ntoken == 2
-    let res = github#connect('/repos', 'show', g:github#user)
+    let res = gitlab#connect('/repos', 'show', g:gitlab#user)
     return map(res.repositories, 'v:val.name')
   else
     return []
@@ -509,3 +528,5 @@ endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
+
+" vim:set et ts=2 sts=2 sw=2 tw=0 foldmethod=marker commentstring=\ "\ %s:

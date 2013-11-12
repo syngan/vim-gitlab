@@ -1,7 +1,7 @@
 " A vim client for Gitlab
 " Author: syngan
 "
-" Original source is from https://github.com/thinca/vim-github
+" Original source is: https://github.com/thinca/vim-github
 " An interface for Gitlab.
 " Version: 0.1.0
 " Author : thinca <thinca+vim@gmail.com>
@@ -37,17 +37,28 @@ function! s:Gitlab.initialize(user)
   let self.user = a:user
 endfunction
 
-function! s:get_auth_token()
-  let secret = ''
-  if exists('g:gitlab#password')
-    let password = g:gitlab#password
+function! s:Base.get_token()
+  let site = g:gitlab_config[self.site]
+	if has_key(site, "token")
+		return site.token
+	endif
+
+  if has_key(site, 'password')
+    let password = site.password
   else
-    let password = inputsecret('Gitlab Password for '.g:gitlab#user.':')
+    let password = inputsecret('Gitlab Password for '. site.user.':')
   endif
-  if len(password) > 0
-	let secret = gitlabapi#token(s:domain, "admin", "admin@local.host", password)
-  endif
-  return secret
+
+  try
+    let token = gitlabapi#token(site.url, site.user, site.email, password)
+    let site.password = password
+    let site.token = token
+  catch
+    echo v:exception
+    throw "login failed: site=" . self.site
+  endtry
+
+  return token
 endfunction
 
 function! s:Gitlab.connect(method, path, ...)
@@ -201,7 +212,7 @@ endfunction
 function! gitlab#read(path)
 echomsg "gitlab#read() path=" . a:path
   try
-    let uri = gitlab#parse_path(a:path, 'gitlab://:user@:url/:feature/::param')
+    let uri = gitlab#parse_path(a:path, 'gitlab://:site/:feature/::param')
     if !exists('b:gitlab')
       if empty(uri)
         throw 'gitlab: Invalid path: ' . a:path
@@ -210,7 +221,9 @@ echomsg "gitlab#read() path=" . a:path
         throw 'gitlab: Specified feature is not registered: ' . uri.feature
       endif
 echomsg "gitlab#read() call new"
-      let b:gitlab = s:features[uri.feature].new('/' . uri.param)
+echo uri
+      let b:gitlab = s:features[uri.feature].new(uri.site, '/' . uri.param)
+echo "@@@ has_site! " . has_key(b:gitlab, "site")
     endif
     let &l:filetype = 'gitlab-' . uri.feature
     call b:gitlab.read()
@@ -224,11 +237,20 @@ endfunction
 function! gitlab#invoke(argline)
   " The simplest implementation.
   try
-    let [feat; args] = split(a:argline, '\s\+')
+    let [site, feat; args] = split(a:argline, '\s\+')
+	if !exists("g:gitlab_config")
+      throw 'gitlab: g:gitlab_config is not defined'
+	endif
+	if !has_key(g:gitlab_config, site)
+      throw 'gitlab: g:gitlab_config[' . site  . '] is not defined'
+	endif
+	if type(g:gitlab_config[site]) != type({})
+      throw 'gitlab: g:gitlab_config[' . site  . '] is not dictionary'
+	endif
     if !has_key(s:features, feat)
       throw 'gitlab: Specified feature is not registered: ' . feat
     endif
-    call s:features[feat].invoke(args)
+    call s:features[feat].invoke(site, args)
   catch /^gitlab:/
     echohl ErrorMsg
     echomsg v:exception
@@ -340,10 +362,12 @@ endif
 " Register the default features. {{{1
 function! s:register_defaults()
   let list = split(globpath(&runtimepath, 'autoload/gitlab/*.vim'), "\n")
+  echo list
   for name in map(list, 'fnamemodify(v:val, ":t:r")')
     try
       call gitlab#register(gitlab#{name}#new())
     catch /:E\%(117\|716\):/
+		echo v:exception
     endtry
   endfor
 endfunction
@@ -353,3 +377,5 @@ call s:register_defaults()
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
+
+" vim:set et ts=2 sts=2 sw=2 tw=0 foldmethod=marker commentstring=\ "\ %s:
