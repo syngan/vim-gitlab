@@ -20,19 +20,21 @@ function! s:Issues.initialize(site, user, repos)
 endfunction
 
 function! s:Issues.get(number)
-  let left = 0
-  let right = len(self.issues) - 1
-  while left < right
-    let mid = (left + right) / 2
-    if self.issues[mid].id < a:number
-      let left = mid
-    elseif self.issues[mid].id > a:number
-      let right = mid
-    else
-      return self.issues[mid]
-    endif
-  endwhile
-  return self.issues[left]
+  return self.issues[a:number - 1]
+  " let left = 0
+  " let right = len(self.issues) - 1
+  " while left <= right
+  "   let mid = (left + right) / 2
+  "   " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
+  "   if self.issues[mid].id < a:number
+  "     let left = mid + 1
+  "   elseif self.issues[mid].id > a:number
+  "     let right = mid - 1
+  "   else
+  "     return self.issues[mid]
+  "   endif
+  " endwhile
+  " return self.issues[left]
 endfunction
 
 function! s:Issues.list()
@@ -45,25 +47,35 @@ function! s:Issues.comment_count(number)
 endfunction
 
 function! s:get_issue_all(self)
-  return a:self.connect('GET', '/projects/:id/issues', {}, 1)
+  let issues = a:self.connect('GET', '/projects/:id/issues', {}, 1)
+  return issues
 endfunction
 
 function! s:Issues.update_list()
   let open = s:get_issue_all(self)
-  call map(open, 's:normalize_issue(v:val)')
   let self.issues = sort(open, s:func('order_by_number'))
+  call map(self.issues, 's:normalize_issue(v:val, v:key+1)')
 endfunction
 
 function! s:Issues.create_new_issue(title, body)
-  let issue = self.connect('post', 'issues', {'title': a:title, 'body': a:body})
-  call add(self.issues, s:normalize_issue(issue))
+   " title (required) - The title of an issue
+   " description (optional) - The description of an issue
+   " assignee_id (optional) - The ID of a user to assign issue
+   " milestone_id (optional) - The ID of a milestone to assign issue
+   " labels (optional) - Comma-separated label names for an issue
+  let path = "/projects/:id/issues"
+  let param = {'title' : a:title, 'description' : a:body}
+  let issue = self.connect('POST', path, param, 0)[0]
+  let number = len(self.issues) + 1
+  call add(self.issues, s:normalize_issue(issue, number))
   return issue
 endfunction
 
 function! s:Issues.update_issue(number, title, body)
   let res = self.connect('patch', 'issues', string(0 + a:number), {'title': a:title, 'body': a:body})
   let res.comments = self.get(a:number).comments
-  let self.get(a:number) = res
+"  let self.get(a:number) = res
+  let self.issues[a:number - 1] = res
 endfunction
 
 function! s:Issues.add_comment(number, comment)
@@ -75,7 +87,8 @@ function! s:Issues.fetch_comments(number, ...)
   let issue = self.get(a:number)
   let force = a:0 && a:1
   if force || !has_key(issue, 'comments') || type(issue.comments) == type(0)
-    let path = "/projects/:id/issues/" . a:number . "/notes"
+    let id = issue.id
+    let path = "/projects/:id/issues/" . id . "/notes"
     let issue.comments = self.connect('GET', path, {}, 0)
     echo issue.comments
   endif
@@ -152,13 +165,14 @@ function! s:Issues.connect(method, url, data, is_pagelist)
   endif
 endfunction
 
-function! s:normalize_issue(issue)
+function! s:normalize_issue(issue, key)
   if !has_key(a:issue, 'id')
     let a:issue.id = -1
   endif
   if !has_key(a:issue, 'title')
     let a:issue.title = "NO TITLE"
   endif
+  let a:issue.number = a:key
   return a:issue
 endfunction
 
@@ -205,13 +219,13 @@ endfunction
 
 function! s:UI.update_issue_list()
   " Save the sorted list
-echomsg "gitlab#issues update_issue_list() start"
+echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
   let list = sort(self.issues.list(), s:func('compare_list'))
   let self.issue_list = list
   let length = len(self.issue_list)
   let self.rev_index = {}
   for i in range(length)
-    let self.rev_index[list[i].id - 1] = i
+    let self.rev_index[list[i].id] = i
   endfor
   echomsg "gitlab#issues update_issue_list() end"
 endfunction
@@ -278,7 +292,7 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  return printf('%3d: %-6s| %s%s', a:issue.id, a:issue.state,
+  return printf('%3d: %-6s| %s%s', a:issue.number, a:issue.state,
   \      join(map(copy(a:issue.labels), '"[". v:val.name ."]"'), ''),
   \      substitute(a:issue.title, '\n', '', 'g'))
 endfunction
@@ -288,7 +302,7 @@ call vimconsole#log("gitlab#issues layout()")
 call vimconsole#log(a:issue)
   let i = a:issue
   let lines = [
-  \ i.id. ': ' . i.title,
+  \ i.number. ': ' . i.title,
   \ 'user: ' . i.author.username,
   \ 'labels: ' . join(map(copy(i.labels), 'v:val.name'), ', '),
   \ 'created: ' . i.created_at,
@@ -341,8 +355,8 @@ echomsg "gitlab#issues perform()" . has_key(self, "site")
       call self.open('new')
     else
       let number = matchstr(getline('.'), '^\s*\zs\d\+\ze\s*:')
-      echo "number=" . number
       if number =~ '^\d\+$'
+        echo self.issues
         call self.open(number)
       endif
     endif
@@ -360,6 +374,7 @@ echomsg "gitlab#issues perform()" . has_key(self, "site")
     endif
   elseif self.mode ==# 'issue' && self.type ==# 'edit'
     if button ==# '[[POST]]'
+      echomsg "do POST " . self.mode
       let c = getpos('.')
       try
         1
@@ -393,7 +408,7 @@ echomsg "gitlab#issues perform()" . has_key(self, "site")
 
         else
           let issue = self.issues.create_new_issue(title, body)
-          let number = issue.number
+          let number = issue.id
         endif
 
         if exists('labels')
@@ -439,12 +454,12 @@ function! s:UI.reload()
     call self.open()
   elseif self.mode ==# 'issue' && self.type ==# 'view'
     let self.issue.comments = 0
-    call self.open(self.issue.number)
+    call self.open(self.issue.id)
   endif
 endfunction
 
 function! s:UI.move(cnt)
-  let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.number - 1]
+  let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.id]
   \                                 : -1) + a:cnt
   let length = len(self.issue_list)
   if idx == -2  " <C-k> in issue list.

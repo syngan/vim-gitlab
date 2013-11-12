@@ -221,7 +221,6 @@ echomsg "gitlab#read() path=" . a:path
         throw 'gitlab: Specified feature is not registered: ' . uri.feature
       endif
 echomsg "gitlab#read() call new"
-echo uri
       let b:gitlab = s:features[uri.feature].new(uri.site, '/' . uri.param)
 echo "@@@ has_site! " . has_key(b:gitlab, "site")
     endif

@@ -84,8 +84,12 @@ function! gitlabapi#connect(session, method, url, data) " {{{
 
   call vimconsole#log("gitlabapi#connect: url=" . a:url)
 
-  let ret = s:HTTP.get(url, a:data, headers)
-  if ret.status == 200
+  if a:method == 'GET'
+    let ret = s:HTTP.get(url, a:data, headers)
+  else
+    let ret = s:HTTP.post(url, a:data, headers)
+  endif
+  if ret.status == 200 || ret.status == 201
     let js = s:JSON.decode(ret.content)
     if type(js) == type([])
       return js
