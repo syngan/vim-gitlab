@@ -77,10 +77,12 @@ function! gitlabapi#projects(session, ...) " {{{
 endfunction " }}}
 
 
-function! gitlabapi#connect(session, url, data) " {{{
+function! gitlabapi#connect(session, method, url, data) " {{{
   let url = a:session.url . a:url
   let a:data.private_token = a:session.token
   let headers = {}
+
+  call vimconsole#log("gitlabapi#connect: url=" . a:url)
 
   let ret = s:HTTP.get(url, a:data, headers)
   if ret.status == 200

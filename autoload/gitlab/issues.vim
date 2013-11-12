@@ -20,7 +20,19 @@ function! s:Issues.initialize(site, user, repos)
 endfunction
 
 function! s:Issues.get(number)
-  return self.issues[a:number - 1]
+  let left = 0
+  let right = len(self.issues) - 1
+  while left < right
+    let mid = (left + right) / 2
+    if self.issues[mid].id < a:number
+      let left = mid
+    elseif self.issues[mid].id > a:number
+      let right = mid
+    else
+      return self.issues[mid]
+    endif
+  endwhile
+  return self.issues[left]
 endfunction
 
 function! s:Issues.list()
@@ -33,39 +45,13 @@ function! s:Issues.comment_count(number)
 endfunction
 
 function! s:get_issue_all(self)
-  " state=open/...
-  let issues = []
-  let page = 1
-  let token = a:self.get_token()
-  let proj_id = gitlabapi#project_id(token, a:self.user, a:self.repos)
-  echo "proj.id=" . proj_id
-  if proj_id < 0
-    throw "project not found: " . a:self.user . "/" . a:self.repos
-  endif
-
-  while 1
-    let data = gitlabapi#issues(token, page, 100, proj_id)
-    let issues += data
-    if len(data) < 100
-      break
-    endif
-    let page += 1
-  endwhile
-  return issues
+  return a:self.connect('GET', '/projects/:id/issues', {}, 1)
 endfunction
 
 function! s:Issues.update_list()
   let open = s:get_issue_all(self)
   call map(open, 's:normalize_issue(v:val)')
   let self.issues = sort(open, s:func('order_by_number'))
-
-  echo ">>> issues: "
-  for iss in self.issues
-    echo iss.id . "," . iss.state . "," . iss.title
-  endfor
-  echo self.issues[-2]
-  echo "<<< issues"
-
 endfunction
 
 function! s:Issues.create_new_issue(title, body)
@@ -76,8 +62,8 @@ endfunction
 
 function! s:Issues.update_issue(number, title, body)
   let res = self.connect('patch', 'issues', string(0 + a:number), {'title': a:title, 'body': a:body})
-  let res.comments = self.issues[a:number - 1].comments
-  let self.issues[a:number - 1] = res
+  let res.comments = self.get(a:number).comments
+  let self.get(a:number) = res
 endfunction
 
 function! s:Issues.add_comment(number, comment)
@@ -89,7 +75,9 @@ function! s:Issues.fetch_comments(number, ...)
   let issue = self.get(a:number)
   let force = a:0 && a:1
   if force || !has_key(issue, 'comments') || type(issue.comments) == type(0)
-    let issue.comments = self.connect('get', 'issues', string(0 + a:number), 'comments')
+    let path = "/projects/:id/issues/" . a:number . "/notes"
+    let issue.comments = self.connect('GET', path, {}, 0)
+    echo issue.comments
   endif
 endfunction
 
@@ -130,16 +118,38 @@ function! s:Issues.reopen(number)
   let self.issues[a:number - 1] = self.connect('patch', 'issues', string(0 + a:number), {'state': 'open'})
 endfunction
 
-function! s:Issues.connect(method, action, ...)
-  let res = gitlab#connect(a:method, '/repos', self.user, self.repos, a:action, a:000, 0)
-  if type(res) == type({})
-    if has_key(res, 'error')
-      throw 'gitlab: issues: API error: ' . res.error
-    elseif get(res, 'message', '') ==# 'Bad credentials'
-      throw 'gitlab: issues: API error: Bad credentials'
-    endif
+function! s:Issues.connect(method, url, data, is_pagelist)
+
+  let token = self.get_token()
+  let proj_id = gitlabapi#project_id(token, self.user, self.repos)
+  if proj_id < 0
+    throw "project not found: " . self.user . "/" . self.repos
   endif
-  return res
+
+  let url = substitute(a:url, '/:id/', '/' . proj_id . '/', '')
+
+  if a:is_pagelist
+    let page = 1
+    let resp = []
+    while 1
+      let a:data.per_page = 100
+      let a:data.page = page
+      let data = gitlabapi#connect(token, a:method, url, a:data)
+      let resp += data
+      if len(data) < 100
+        break
+      endif
+      let page += 1
+    endwhile
+
+    return resp
+  else
+    let resp = gitlabapi#connect(token, a:method, url, a:data)
+    echo "connect: " . a:url
+    echo resp
+    call vimconsole#log(resp)
+    return resp
+  endif
 endfunction
 
 function! s:normalize_issue(issue)
@@ -274,12 +284,12 @@ function! s:UI.line_format(issue)
 endfunction
 
 function! s:UI.issue_layout(issue)
-echomsg "gitlab#issues layout()"
+call vimconsole#log("gitlab#issues layout()")
+call vimconsole#log(a:issue)
   let i = a:issue
   let lines = [
-  \ i.number . ': ' . i.title,
-  \ 'state: ' . i.state,
-  \ 'user: ' . i.user.login,
+  \ i.id. ': ' . i.title,
+  \ 'user: ' . i.author.username,
   \ 'labels: ' . join(map(copy(i.labels), 'v:val.name'), ', '),
   \ 'created: ' . i.created_at,
   \ ]
@@ -294,12 +304,12 @@ echomsg "gitlab#issues layout()"
     let lines += ['votes: ' . i.votes]
   endif
 
-  let lines += [''] + split(i.body, '\r\?\n') + ['', '']
+  let lines += [''] + split(i.title, '\r\?\n') + ['', '']
 
   for c in i.comments
     let lines += [
     \ '------------------------------------------------------------',
-    \ '  ' . c.user.login . ' ' . c.created_at,
+    \ '  ' . c.author.username . ' ' . c.created_at,
     \ '',
     \ ]
     let lines += map(split(c.body, '\r\?\n'), '"  " . v:val')
