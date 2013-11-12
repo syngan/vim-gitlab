@@ -79,7 +79,10 @@ function! s:Issues.update_issue(number, title, body)
 endfunction
 
 function! s:Issues.add_comment(number, comment)
-  let comment = self.connect('post', 'issues', string(0 + a:number), 'comments', {'body': a:comment})
+  let issue = self.get(a:number)
+  let path = "/projects/:id/issues/" . issue.id . "/notes"
+  let param = {'body' : a:comment}
+  let comment = self.connect('POST', path, param, 0)[0]
   call add(self.get(a:number).comments, comment)
 endfunction
 
@@ -90,7 +93,6 @@ function! s:Issues.fetch_comments(number, ...)
     let id = issue.id
     let path = "/projects/:id/issues/" . id . "/notes"
     let issue.comments = self.connect('GET', path, {}, 0)
-    echo issue.comments
   endif
 endfunction
 
@@ -159,7 +161,6 @@ function! s:Issues.connect(method, url, data, is_pagelist)
   else
     let resp = gitlabapi#connect(token, a:method, url, a:data)
     echo "connect: " . a:url
-    echo resp
     call vimconsole#log(resp)
     return resp
   endif
@@ -320,6 +321,7 @@ call vimconsole#log(a:issue)
 
   let lines += [''] + split(i.title, '\r\?\n') + ['', '']
 
+  echomsg "i.comments.len=" . len(i.comments)
   for c in i.comments
     let lines += [
     \ '------------------------------------------------------------',
@@ -327,6 +329,7 @@ call vimconsole#log(a:issue)
     \ '',
     \ ]
     let lines += map(split(c.body, '\r\?\n'), '"  " . v:val')
+    unlet c
   endfor
 
   let lines += ['', '', '[[add comment]]']
@@ -356,7 +359,6 @@ echomsg "gitlab#issues perform()" . has_key(self, "site")
     else
       let number = matchstr(getline('.'), '^\s*\zs\d\+\ze\s*:')
       if number =~ '^\d\+$'
-        echo self.issues
         call self.open(number)
       endif
     endif
@@ -499,7 +501,6 @@ function! s:UI.invoke(site, args)
     call add(path, a:args[1])
   endif
 
-  echo path
  echomsg "invoke . call new"
   let ui = self.new(a:site, '/' . join(path, '/'))
  echomsg "invoke . call open"
