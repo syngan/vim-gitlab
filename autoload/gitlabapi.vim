@@ -76,18 +76,13 @@ function! gitlabapi#projects(session, ...) " {{{
   endif
 endfunction " }}}
 
-function! gitlabapi#issues(session, page, per_page, ...) " {{{
-  if a:0 == 0
-    let url = a:session.url . '/issues'
-  else
-    let url = a:session.url . '/projects/' . a:1 . '/issues'
-  endif
-  echo "issues a:0=" . a:0 . ":url=" . url
 
-  let data = {'page' : a:page, 'per_page' : a:per_page, 'private_token' : a:session.token}
+function! gitlabapi#connect(session, url, data) " {{{
+  let url = a:session.url . a:url
+  let a:data.private_token = a:session.token
   let headers = {}
 
-  let ret = s:HTTP.get(url, data, headers)
+  let ret = s:HTTP.get(url, a:data, headers)
   if ret.status == 200
     let js = s:JSON.decode(ret.content)
     if type(js) == type([])
@@ -97,8 +92,19 @@ function! gitlabapi#issues(session, page, per_page, ...) " {{{
     endif
   else
     echo ret.status . ", " . url
-    throw s:throw_error(a:session, "issues", ret)
+    throw s:throw_error(a:session, a:url, ret)
   endif
+endfunction " }}}
+
+function! gitlabapi#issues(session, page, per_page, ...) " {{{
+  if a:0 == 0
+    let url = '/issues'
+  else
+    let url = '/projects/' . a:1 . '/issues'
+  endif
+  let data = {'page' : a:page, 'per_page' : a:per_page}
+
+  return gitlabapi#connect(a:session, url, data)
 endfunction " }}}
 
 let &cpo = s:save_cpo
