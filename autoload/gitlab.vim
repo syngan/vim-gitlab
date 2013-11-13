@@ -43,10 +43,10 @@ function! s:Base.get_token()
 		return site.token
 	endif
 
-  if has_key(site, 'password')
+  if has_key(site, 'password') && site.password != ""
     let password = site.password
   else
-    let password = inputsecret('Gitlab Password for '. site.user.':')
+    let password = inputsecret('Gitlab Password for '. site.user.': ')
   endif
 
   try
@@ -61,41 +61,41 @@ function! s:Base.get_token()
   return token
 endfunction
 
-function! s:Gitlab.connect(method, path, ...)
-  let method = toupper(a:method)
-  let path = a:path
-  let params = {}
-  let raw = 0
-  for a in gitlab#flatten(a:000)
-    if type(a) == type(0)
-      let raw = a
-    elseif type(a) == type('')
-      let path .= '/' . a
-    elseif type(a) == type({})
-      call extend(params, a)
-    endif
-    unlet a
-  endfor
-
-  try
-    if len(s:token) == 0
-      let s:token = s:get_auth_token()
-    endif
-    let url = printf('https://%s%s%s', s:domain, s:base_path, path)
-    if method == 'GET'
-      let ret = s:http.get(url, params,
-      \  {'Authorization': printf('token %s', s:token)})
-    else
-      let ret = s:http.post(url, s:json.encode(params),
-      \  {'Authorization': printf('token %s', s:token), 'Content-Type': 'application/json'}, method)
-    endif
-    let res = ret.content
-  catch
-    let res = ''
-  endtry
-
-  return raw ? s:iconv(res, 'utf-8', &encoding) : s:json.decode(res)
-endfunction
+" function! s:Gitlab.connect(method, path, ...)
+"   let method = toupper(a:method)
+"   let path = a:path
+"   let params = {}
+"   let raw = 0
+"   for a in gitlab#flatten(a:000)
+"     if type(a) == type(0)
+"       let raw = a
+"     elseif type(a) == type('')
+"       let path .= '/' . a
+"     elseif type(a) == type({})
+"       call extend(params, a)
+"     endif
+"     unlet a
+"   endfor
+"
+"   try
+"     if len(s:token) == 0
+"       let s:token = s:get_auth_token()
+"     endif
+"     let url = printf('https://%s%s%s', s:domain, s:base_path, path)
+"     if method == 'GET'
+"       let ret = s:http.get(url, params,
+"       \  {'Authorization': printf('token %s', s:token)})
+"     else
+"       let ret = s:http.post(url, s:json.encode(params),
+"       \  {'Authorization': printf('token %s', s:token), 'Content-Type': 'application/json'}, method)
+"     endif
+"     let res = ret.content
+"   catch
+"     let res = ''
+"   endtry
+"
+"   return raw ? s:iconv(res, 'utf-8', &encoding) : s:json.decode(res)
+" endfunction
 
 " UI  {{{1
 let s:UI = s:Base.new()
