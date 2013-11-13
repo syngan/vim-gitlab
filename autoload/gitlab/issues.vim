@@ -148,11 +148,21 @@ function! s:Issues.update_labels(label, number, ...)
 endfunction
 
 function! s:Issues.close(number)
-  let self.issues[a:number - 1] = self.connect('patch', 'issues', string(0 + a:number), {'state': 'closed'})
+  let issue = self.get(a:number)
+  let path = "/projects/:id/issues/" . issue.id
+  let param = {'state_event' : 'close'}
+  let resp = self.connect('PUT', path, param, 0)[0]
+  let resp.comments = self.get(a:number).comments
+  call self.set(a:number, resp)
 endfunction
 
 function! s:Issues.reopen(number)
-  let self.issues[a:number - 1] = self.connect('patch', 'issues', string(0 + a:number), {'state': 'opened'})
+  let issue = self.get(a:number)
+  let path = "/projects/:id/issues/" . issue.id
+  let param = {'state_event' : 'reopen'}
+  let resp = self.connect('PUT', path, param, 0)[0]
+  let resp.comments = self.get(a:number).comments
+  call self.set(a:number, resp)
 endfunction
 
 function! s:Issues.connect(method, url, data, is_pagelist)
