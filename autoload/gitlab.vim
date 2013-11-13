@@ -46,18 +46,14 @@ function! s:Base.get_token()
   if has_key(site, 'password') && site.password != ""
     let password = site.password
   else
-    let password = inputsecret('GitLab password for '. site.user.': ')
+    let user = site.user == "" ? site.email : site.user
+    let password = inputsecret('GitLab password for '. user.': ')
   endif
 
-  try
-    let token = gitlabapi#token(site.url, site.user, site.email, password)
-    let site.password = password
-    let site.token = token
-  catch
-    echo v:exception
-    throw "login failed: site=" . self.site
-  endtry
-
+  " throw exception if login failed
+  let token = gitlabapi#token(site.url, site.user, site.email, password)
+  let site.password = password
+  let site.token = token
   return token
 endfunction
 

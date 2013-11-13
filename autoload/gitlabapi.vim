@@ -32,12 +32,30 @@ function! gitlabapi#token(url, id, email, password) " {{{
   if ret.success
     return {'url' : url, 'token' : ret.content.private_token}
   else
-    throw 'gitlabapi#token() failed, status=' . ret.status
+    throw s:throw_error({'url' : a:url}, "login", ret)
   endif
 endfunction " }}}
 
 function! s:throw_error(session, api, ret) " {{{
-  return a:api . ' failed: status=' . a:ret.status . ' at ' . a:session.url
+
+  let msg = a:ret.status
+  if a:ret.status == 400
+    let msg .= ": Bad Request"
+  elseif a:ret.status == 401
+    let msg .= ": Unauthrorized"
+  elseif a:ret.status == 403
+    let msg .= ": Forbidden"
+  elseif a:ret.status == 404
+    let msg .= ": Not Found"
+  elseif a:ret.status == 405
+    let msg .= ": Method Not Allowed"
+  elseif a:ret.status == 409
+    let msg .= ": Conflict"
+  elseif a:ret.status == 500
+    let msg .= ": Server Error"
+  endif
+
+  return 'gitlab: ' . a:api . ' failed: status=' . msg . ' at ' . a:session.url
 endfunction " }}}
 
 function! gitlabapi#project_id(session, path, name)  " {{{
@@ -96,10 +114,8 @@ function! gitlabapi#connect(session, method, url, data) " {{{
     else
       return [js]
     endif
-  else
-    echo ret.status . ", " . url
-    throw s:throw_error(a:session, a:url, ret)
   endif
+  throw s:throw_error(a:session, "", ret)
 endfunction " }}}
 
 function! gitlabapi#issues(session, page, per_page, ...) " {{{
