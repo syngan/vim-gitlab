@@ -328,8 +328,6 @@ function! s:UI.line_format(issue)
 endfunction
 
 function! s:UI.issue_layout(issue)
-call vimconsole#log("gitlab#issues layout()")
-call vimconsole#log(a:issue)
   let i = a:issue
   let lines = [
   \ i.iid . ': ' . i.title,
@@ -348,9 +346,8 @@ call vimconsole#log(a:issue)
     let lines += ['votes: ' . i.votes]
   endif
 
-  let lines += [''] + split(i.title, '\r\?\n') + ['', '']
+  let lines += [''] + split(i.description, '\r\?\n') + ['', '']
 
-  echomsg "i.comments.len=" . len(i.comments)
   for c in i.comments
     let lines += [
     \ '------------------------------------------------------------',
