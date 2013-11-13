@@ -46,7 +46,7 @@ function! s:Base.get_token()
   if has_key(site, 'password') && site.password != ""
     let password = site.password
   else
-    let password = inputsecret('Gitlab Password for '. site.user.': ')
+    let password = inputsecret('GitLab password for '. site.user.': ')
   endif
 
   try
