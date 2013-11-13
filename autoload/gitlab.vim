@@ -22,7 +22,7 @@ let s:V = vital#of('vim-gitlab')
 
 let s:Base = {}  " {{{1
 function! s:Base.new(...)
-echomsg "new() " . (has_key(self, 'name') ? self.name : "")
+"echomsg "new() " . (has_key(self, 'name') ? self.name : "")
   let obj = copy(self)
   if has_key(obj, 'initialize')
     call call(obj.initialize, a:000, obj)
@@ -160,9 +160,7 @@ function! gitlab#parse_path(path, pattern)
   let placefolder_pattern = '\v%((::?|#)\w+|\*\*?)'
   let regexp = substitute(a:pattern, placefolder_pattern,
   \                       '\=s:convert_placefolder(submatch(0))', 'g')
-  echo "regexp=" . regexp
   let matched = matchlist(a:path, '^' . regexp . '\m$')
-  echo matched
   if empty(matched)
     return {}
   endif
@@ -210,7 +208,7 @@ endfunction
 
 " pseudo buffer. {{{1
 function! gitlab#read(path)
-echomsg "gitlab#read() path=" . a:path
+"echomsg "gitlab#read() path=" . a:path
   try
     let uri = gitlab#parse_path(a:path, 'gitlab://:site/:feature/::param')
     if !exists('b:gitlab')
@@ -220,9 +218,7 @@ echomsg "gitlab#read() path=" . a:path
       if !has_key(s:features, uri.feature)
         throw 'gitlab: Specified feature is not registered: ' . uri.feature
       endif
-echomsg "gitlab#read() call new"
       let b:gitlab = s:features[uri.feature].new(uri.site, '/' . uri.param)
-echo "@@@ has_site! " . has_key(b:gitlab, "site")
     endif
     let &l:filetype = 'gitlab-' . uri.feature
     call b:gitlab.read()
@@ -361,12 +357,10 @@ endif
 " Register the default features. {{{1
 function! s:register_defaults()
   let list = split(globpath(&runtimepath, 'autoload/gitlab/*.vim'), "\n")
-  echo list
   for name in map(list, 'fnamemodify(v:val, ":t:r")')
     try
       call gitlab#register(gitlab#{name}#new())
     catch /:E\%(117\|716\):/
-		echo v:exception
     endtry
   endfor
 endfunction

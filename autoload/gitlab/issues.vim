@@ -14,7 +14,6 @@ let s:Issues = gitlab#base()
 let s:Issues.name = 'issues'
 
 function! s:Issues.initialize(site, user, repos)
-  echo "@@@@ called initialize!"
   let [self.site, self.user, self.repos] = [a:site, a:user, a:repos]
   let self.issues = []  " issues: Always sorted by issue number.
 endfunction
@@ -191,8 +190,6 @@ function! s:Issues.connect(method, url, data, is_pagelist)
     return resp
   else
     let resp = gitlabapi#connect(token, a:method, url, a:data)
-    echo "connect: " . a:url
-    call vimconsole#log(resp)
     return resp
   endif
 endfunction
@@ -228,7 +225,7 @@ endfunction
 let s:UI = {'name': 'issues'}
 
 function! s:UI.initialize(site, path)
-echomsg "gitlab#issues iniaialize() start: " . a:path
+"echomsg "gitlab#issues iniaialize() start: " . a:path
   let pathinfo = gitlab#parse_path(a:path, '/:user/:repos/\?::path')
   if empty(pathinfo)
     throw 'gitlab: issues: Require the repository name.'
@@ -251,12 +248,11 @@ echomsg "gitlab#issues iniaialize() start: " . a:path
 
   let self.issues = s:get_issue(a:site, pathinfo.user, pathinfo.repos)
   call self.update_issue_list()
-  echomsg "gitlab#issues iniaialize() end"
 endfunction
 
 function! s:UI.update_issue_list()
   " Save the sorted list
-echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
+"echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
   let list = sort(self.issues.list(), s:func('compare_list'))
   let self.issue_list = list
   let length = len(self.issue_list)
@@ -265,22 +261,17 @@ echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
   for i in range(length)
     let self.rev_index[list[i].iid] = i
   endfor
-  echomsg "gitlab#issues update_issue_list() end"
 endfunction
 
 function! s:UI.open(...)
   let base = [self.site, self.name, self.issues.user, self.issues.repos]
 
-echomsg "ui.open() flatten"
   let args = gitlab#flatten(a:000)
   let path = printf('gitlab://%s', join(base + args, '/'))
-echomsg "ui.open() edit: path=" . path
   let edit = get(args, -1, '') =~# '^\%(edit\|new\)$'
-echomsg "ui.open() opener: edit=" . edit
   " TODO: Opener is made customizable.
   let opener = edit || &l:filetype !=# 'gitlab-issues' ? 'new' : 'edit'
   execute opener '`=path`'
-echomsg "ui.open() opner=" . opener
 endfunction
 
 function! s:UI.updated()
@@ -307,8 +298,8 @@ function! s:UI.view_issue()
   let self.issue = self.issues.get(self.number)
   let w:gitlab_issues_last_opened = self.number
 
-  return ['[[edit]] ' . (self.issue.state ==# 'opened' ?
-  \       '[[close]]' : '[[reopen]]')] + self.issue_layout(self.issue)
+  return ['[[edit]] ' . (self.issue.state ==# 'closed' ?
+  \       '[[reopen]]' : '[[close]]')] + self.issue_layout(self.issue)
 endfunction
 
 function! s:UI.edit_issue()
@@ -330,7 +321,6 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  echo a:issue.labels
   return printf('%3d: %-6s| %s%s',
         \ a:issue.iid,
         \ a:issue.state,
@@ -377,7 +367,6 @@ endfunction
 
 " Control.  {{{1
 function! s:UI.action()
-echomsg "gitlab#issues action() " . has_key(self, "site")
   try
     call self.perform(gitlab#get_text_on_cursor('\[\[.\{-}\]\]'))
   catch /^gitlab:/
@@ -388,7 +377,7 @@ echomsg "gitlab#issues action() " . has_key(self, "site")
 endfunction
 
 function! s:UI.perform(button)
-echomsg "gitlab#issues perform()" . has_key(self, "site")
+"echomsg "gitlab#issues perform()" . has_key(self, "site")
   let button = a:button
   if self.mode ==# 'list'
     if button ==# '[[new issue]]'
@@ -413,7 +402,6 @@ echomsg "gitlab#issues perform()" . has_key(self, "site")
     endif
   elseif self.mode ==# 'issue' && self.type ==# 'edit'
     if button ==# '[[POST]]'
-      echomsg "do POST " . self.mode
       let c = getpos('.')
       try
         1
@@ -500,7 +488,6 @@ endfunction
 function! s:UI.move(cnt)
   let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.iid]
   \                                 : -1) + a:cnt
-  echo "move() cnt=" . a:cnt . ",idx=" . idx
   let length = len(self.issue_list)
   if idx == -2  " <C-k> in issue list.
     let idx = length - 1
@@ -513,7 +500,6 @@ function! s:UI.move(cnt)
 endfunction
 
 function! s:UI.read()
-echomsg "read()"
   let cursor = getpos('.')
   setlocal modifiable noreadonly
   let name = self.type . '_' . self.mode
@@ -539,12 +525,9 @@ function! s:UI.invoke(site, args)
     call add(path, a:args[1])
   endif
 
- echomsg "invoke . call new"
   let ui = self.new(a:site, '/' . join(path, '/'))
- echomsg "invoke . call open"
   let ui.site = a:site
   call ui.open(path[2 :])
- echomsg "invoke . end"
 endfunction
 
 
