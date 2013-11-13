@@ -70,8 +70,8 @@ endfunction
 
 function! s:Issues.update_list()
   let open = s:get_issue_all(self)
+  call map(open, 's:normalize_issue(v:val)')
   let self.issues = sort(open, s:func('order_by_number'))
-  call map(self.issues, 's:normalize_issue(v:val, v:key+1)')
 endfunction
 
 function! s:Issues.create_new_issue(title, body)
@@ -83,8 +83,7 @@ function! s:Issues.create_new_issue(title, body)
   let path = "/projects/:id/issues"
   let param = {'title' : a:title, 'description' : a:body}
   let issue = self.connect('POST', path, param, 0)[0]
-  let number = len(self.issues) + 1
-  call add(self.issues, s:normalize_issue(issue, number))
+  call add(self.issues, s:normalize_issue(issue))
   return issue
 endfunction
 
@@ -198,17 +197,19 @@ function! s:Issues.connect(method, url, data, is_pagelist)
   endif
 endfunction
 
-function! s:normalize_issue(issue, key)
+function! s:normalize_issue(issue)
   if !has_key(a:issue, 'id')
     let a:issue.id = -1
   endif
   if !has_key(a:issue, 'iid')
     let a:issue.iid = -1
   endif
+  if a:issue.state == 'reopened'
+    let a:issue.state = 'opened'
+  endif
   if !has_key(a:issue, 'title')
     let a:issue.title = "NO TITLE"
   endif
-  let a:issue.number = a:key
   return a:issue
 endfunction
 
@@ -268,11 +269,11 @@ echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
 endfunction
 
 function! s:UI.open(...)
-  let base = [self.name, self.issues.user, self.issues.repos]
+  let base = [self.site, self.name, self.issues.user, self.issues.repos]
 
 echomsg "ui.open() flatten"
   let args = gitlab#flatten(a:000)
-  let path = printf('gitlab://%s/%s', self.site, join(base + args, '/'))
+  let path = printf('gitlab://%s', join(base + args, '/'))
 echomsg "ui.open() edit: path=" . path
   let edit = get(args, -1, '') =~# '^\%(edit\|new\)$'
 echomsg "ui.open() opener: edit=" . edit
@@ -499,6 +500,7 @@ endfunction
 function! s:UI.move(cnt)
   let idx = (has_key(self, 'issue') ? self.rev_index[self.issue.iid]
   \                                 : -1) + a:cnt
+  echo "move() cnt=" . a:cnt . ",idx=" . idx
   let length = len(self.issue_list)
   if idx == -2  " <C-k> in issue list.
     let idx = length - 1
@@ -506,7 +508,7 @@ function! s:UI.move(cnt)
   if idx < 0 || length <= idx
     call self.open()
   else
-    call self.open(self.issue_list[idx].number)
+    call self.open(self.issue_list[idx].iid)
   endif
 endfunction
 
