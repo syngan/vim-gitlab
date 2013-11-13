@@ -432,7 +432,7 @@ function! s:UI.perform(button)
 
         else
           let issue = self.issues.create_new_issue(title, body)
-          let number = issue.id
+          let number = issue.iid
         endif
 
         if exists('labels')
