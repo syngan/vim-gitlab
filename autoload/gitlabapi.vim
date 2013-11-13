@@ -87,7 +87,7 @@ function! gitlabapi#connect(session, method, url, data) " {{{
   if a:method == 'GET'
     let ret = s:HTTP.get(url, a:data, headers)
   else
-    let ret = s:HTTP.post(url, a:data, headers)
+    let ret = s:HTTP.request(a:method, url, {"data" : a:data})
   endif
   if ret.status == 200 || ret.status == 201
     let js = s:JSON.decode(ret.content)

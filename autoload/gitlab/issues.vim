@@ -19,7 +19,8 @@ function! s:Issues.initialize(site, user, repos)
   let self.issues = []  " issues: Always sorted by issue number.
 endfunction
 
-function! s:Issues.get(number)
+
+function! s:Issues.getidx(number)
   let left = 0
   let right = len(self.issues) - 1
   while left <= right
@@ -30,11 +31,28 @@ function! s:Issues.get(number)
     elseif self.issues[mid].iid > a:number
       let right = mid - 1
     else
-      return self.issues[mid]
+      return mid
     endif
   endwhile
-  return self.issues[left]
+  return -1
 endfunction
+
+function! s:Issues.get(number)
+  let idx = self.getidx(a:number)
+  if idx < 0
+    throw "unknown issue #" . a:number
+  endif
+  return self.issues[idx]
+endfunction
+
+function! s:Issues.set(number, val)
+  let idx = self.getidx(a:number)
+  if idx < 0
+    throw "unknown issue #" . a:number
+  endif
+  let self.issues[idx] = a:val
+endfunction
+
 
 function! s:Issues.list()
   return copy(self.issues)
@@ -71,10 +89,15 @@ function! s:Issues.create_new_issue(title, body)
 endfunction
 
 function! s:Issues.update_issue(number, title, body)
-  let res = self.connect('patch', 'issues', string(0 + a:number), {'title': a:title, 'body': a:body})
-  let res.comments = self.get(a:number).comments
+  " number: issue #ID: iid
+  let issue = self.get(a:number)
+  let path = "/projects/:id/issues/" . issue.id
+  let param = {'title' : a:title, 'description' : a:body}
+  let resp = self.connect('PUT', path, param, 0)[0]
+  let resp.comments = self.get(a:number).comments
 "  let self.get(a:number) = res
-  let self.issues.rev_index[a:number] = res
+"  let self.issues[self.rev_index[a:number]] = resp
+  call self.set(a:number, resp)
 endfunction
 
 function! s:Issues.add_comment(number, comment)
@@ -227,6 +250,7 @@ echomsg "gitlab#issues update_issue_list() start: " . len(self.issues)
   let self.issue_list = list
   let length = len(self.issue_list)
   let self.rev_index = {}
+  " issues ID で index
   for i in range(length)
     let self.rev_index[list[i].iid] = i
   endfor
