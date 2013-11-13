@@ -10,6 +10,7 @@ GitLab を vim から参照・変更するプラグインです.
 - 現状 issues のみに対応
 - GitLab は 6-1-stable 以下でも動作しますが `issue #x` の数字と表示される数値が一致しません.
 (API が対応していないため)
+    - c.f. https://github.com/gitlabhq/gitlabhq/commit/02693b72a4240a9d94246e590775a66eb48c55ed
 - thinca さんの vim-github を元にコピー＆修正で作成しています. 
 
 # Install
