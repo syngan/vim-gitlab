@@ -195,11 +195,8 @@ function! s:Issues.connect(method, url, data, is_pagelist)
 endfunction
 
 function! s:normalize_issue(issue)
-  if !has_key(a:issue, 'id')
-    let a:issue.id = -1
-  endif
   if !has_key(a:issue, 'iid')
-    let a:issue.iid = -1
+    let a:issue.iid = a:issue.id
   endif
   if a:issue.state == 'reopened'
     let a:issue.state = 'opened'
