@@ -36,8 +36,8 @@ if b:gitlab.type ==# 'view'
   nmap <buffer> r <Plug>(gitlab-issues-redraw)
   nmap <buffer> R <Plug>(gitlab-issues-reload)
   nmap <buffer> <C-r> <Plug>(gitlab-issues-reload)
-  nmap <buffer> <C-j> <Plug>(gitlab-issues-next)
-  nmap <buffer> <C-k> <Plug>(gitlab-issues-prev)
+  nmap <buffer> <C-l> <Plug>(gitlab-issues-next)
+  nmap <buffer> <C-h> <Plug>(gitlab-issues-prev)
 
   augroup ftplugin-gitlab-issues
     autocmd! * <buffer>
