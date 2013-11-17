@@ -318,7 +318,7 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  return printf('%3d: %-6s| %s%s',
+  return printf('%3d: %-8s| %s%s',
         \ a:issue.iid,
         \ a:issue.state,
   \      join(map(copy(a:issue.labels), '"[". v:val ."]"'), ''),
@@ -352,7 +352,7 @@ function! s:UI.issue_layout(issue)
     \ '  ' . c.author.username . ' ' . c.created_at,
     \ '',
     \ ]
-    let lines += map(split(c.body, '\r\?\n'), '"  " . v:val')
+    let lines += map(split(c.body, '\r\?\n'), 'v:val')
     unlet c
   endfor
 
@@ -517,7 +517,7 @@ function! s:UI.invoke(site, args)
   endif
   let repos = a:args[0]
   let path = repos =~# '/' ? split(repos, '/')[0 : 1]
-  \                        : [g:gitlab#user, repos]
+  \                        : [g:gitlab_config[a:site].user, repos]
   if 2 <= len(a:args)
     call add(path, a:args[1])
   endif
