@@ -53,3 +53,17 @@ g:gitlab_config['__name__'] = {
 ```vim
 :Gitlab __name__ issues root/sandbox
 ```
+
+# Screenshot
+
+## issues list
+![Issues LIST](./img/issues_list.png)
+
+## show issue #2
+![Issues LIST](./img/issue2.png)
+
+## add comment
+![Issues LIST](./img/issue2c.png)
+
+## show issues #2
+![Issues LIST](./img/issue2c2.png)
