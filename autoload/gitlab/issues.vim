@@ -318,7 +318,7 @@ function! s:UI.edit_comment()
 endfunction
 
 function! s:UI.line_format(issue)
-  return printf('%3d: %-6s| %s%s',
+  return printf('%3d: %-8s| %s%s',
         \ a:issue.iid,
         \ a:issue.state,
   \      join(map(copy(a:issue.labels), '"[". v:val ."]"'), ''),
