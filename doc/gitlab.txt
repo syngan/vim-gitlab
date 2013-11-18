@@ -1,0 +1,140 @@
+*gitlab.txt*	An interface for Gitlab.
+
+Version: 0.1.0
+Author : syngan
+
+==============================================================================
+CONTENTS					*gitlab-contents*
+
+INTRODUCTION			|gitlab-introduction|
+INTERFACE			|gitlab-interface|
+  COMMANDS			  |gitlab-commands|
+  PATH                            |gitlab-path|
+SETTINGS			|gitlab-settings|
+FEATURES			|gitlab-features|
+  ISSUES			  |gitlab-feature-issues|
+CHANGELOG			|gitlab-changelog|
+
+
+==============================================================================
+INTRODUCTION					*gitlab-introduction*
+
+*vim-gitlab* is a vim client for GitLab
+
+Requirements:
+- Vim 7.2 or later
+- +python or curl or wget
+
+Latest version:
+http://github.com/syngan/vim-gitlab
+
+This is a modified version of vim-github
+http://github.com/thinca/vim-github
+
+
+==============================================================================
+INTERFACE					*gitlab-interface*
+
+------------------------------------------------------------------------------
+COMMANDS					*gitlab-commands*
+
+:Gitlab {server} {feature} [arguments]			*:Gitlab*
+
+
+------------------------------------------------------------------------------
+PATH						*gitlab-path*
+
+This plugin uses a scheme "gitlab://" for buffer name.  The form is following.
+>
+    gitlab://{server}/{feature}/{path...}
+
+You can open a gitlab buffer with a command which opens a buffer.
+Example:
+>
+    :edit gitlab://{server}/issues/root/sandbox
+
+
+==============================================================================
+SETTINGS					*gitlab-settings*
+						*g:gitlab_config*
+All the options are stored into the global variable g:gitlab_config.  This a
+|Dictionary| where each key is the name of a server.  You can give the name you
+want. The value is a |Dictionary| which containts the following items:
+        "url"           Required
+                URL of a serer.
+        "user"          Required
+                The login of user.
+        "email"         Required if "user" missing
+                The email of user.
+        "password"      Default: (None)
+                Valid password.
+
+==============================================================================
+FEATURES					*gitlab-features*
+
+------------------------------------------------------------------------------
+ISSUES						*gitlab-feature-issues*
+
+Arguments
+---------
+Arguments for the |:Gitlab| command.
+
+Gitlab {serer} issues {user}/{repos}
+			Open the issue.
+
+Gitlab {serer} issues {user}/{repos} new
+			Open the buffer to open a new issue.
+
+Paths
+-----
+Issue list. >
+  gitlab://{server}/issues/{user}/{repos}
+Issue. >
+  gitlab://{server}/issues/{user}/{repos}/{id}
+Edit an issue. >
+  gitlab://{server}/issues/{user}/{repos}/{id}/edit
+New issue. >
+  gitlab://{server}/issues/{user}/{repos}/new
+New comment. >
+  gitlab://{server}/issues/{user}/{repos}/{id}/comment/new
+
+
+Editing an issue
+----------------
+The buffer to edit an issue is following format:
+
+	[[POST]]
+	title: {title}
+	labels: {label1}, {label2}
+	body:
+	{body...}
+
+The first line is a button to post this issue.
+The line that starts with 'title:' is treated as a title.
+The line that starts with 'labels:' is treated as a label list.  This is
+omitable.
+Since the line that starts with 'body:' is treated as a body.  The blank lines
+at the header of body are ignored.
+
+Limitation
+----------
+The following functions are not provided, because API doesn't exist.
+
+- Unread management.
+- Edit a comment.
+- Delete a comment.
+- Get the color of a label.
+- Set the color of a label.
+- Rename a label.
+- Update vote.
+
+
+==============================================================================
+CHANGELOG					*gitlab-changelog*
+
+0.1.0	2013-11-18
+	- Initial version.
+
+
+==============================================================================
+vim:et:tw=78:fo=tcq2mM:ts=8:ft=help:norl
