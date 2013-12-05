@@ -1,7 +1,18 @@
+" Access to the Gitlab Issues.
+" Author : syngan
+
+" original source is:
 " Access to the Github Issues.
 " Version: 0.1.0
 " Author : thinca <thinca+vim@gmail.com>
 " License: zlib License
+
+
+" vim
+" function gitlab#read..180..171..158..150 の処理中にエラーが検出されました:                                                                                       
+" 行    3:
+" E605: 例外が捕捉されませんでした: unknown issue #10
+"
 
 let s:save_cpo = &cpo
 set cpo&vim
@@ -25,9 +36,10 @@ function! s:Issues.getidx(number)
   while left <= right
     let mid = (left + right) / 2
     " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
-    if self.issues[mid].iid < a:number
+    call vimconsole#log("get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id)
+    if self.issues[mid].iid > a:number
       let left = mid + 1
-    elseif self.issues[mid].iid > a:number
+    elseif self.issues[mid].iid < a:number
       let right = mid - 1
     else
       return mid
@@ -39,7 +51,11 @@ endfunction
 function! s:Issues.get(number)
   let idx = self.getidx(a:number)
   if idx < 0
-    throw "unknown issue #" . a:number
+    for i in range(len(self.issues))
+      call vimconsole#log("issue[" . i . "]=" . self.issues[i].iid)
+    endfor
+
+    throw "unknown issue #" . a:number . " /" . len(self.issues)
   endif
   return self.issues[idx]
 endfunction
@@ -105,6 +121,7 @@ function! s:Issues.add_comment(number, comment)
   let comment = self.connect('POST', path, param, 0)[0]
   call add(self.get(a:number).comments, comment)
 endfunction
+
 
 function! s:Issues.fetch_comments(number, ...)
   let issue = self.get(a:number)
@@ -532,13 +549,13 @@ endfunction
 
 " Misc.  {{{1
 function! s:order_by_number(a, b)
-  return a:a.id - a:b.id
+  return a:b.id - a:a.id
 endfunction
 
 function! s:compare_list(a, b)
   " TODO: Be made customizable.
   if a:a.state ==# a:b.state
-    return a:a.id - a:b.id
+    return a:b.id - a:a.id
   else
     return a:a.state ==# 'opened' ? -1 : 1
   endif
