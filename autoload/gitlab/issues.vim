@@ -135,7 +135,7 @@ function! s:Issues.update_labels(label, number, ...)
     call self.remove_labels(removes, a:number)
   else
     for l in type(a:label) == type([]) ? a:label : [a:label]
-      let args = ['label/' . op, a:label] + (a:number != 0 ? [a:number] : [])
+      let args = ['label/' . op, l] + (a:number != 0 ? [a:number] : [])
       let new_labels = call(self.connect, args, self)
     endfor
     if a:number != 0 && exists('new_labels')
@@ -228,7 +228,7 @@ function! s:UI.initialize(site, path)
     throw 'gitlab: issues: Require the repository name.'
   endif
 
-  let path = pathinfo.path
+"  let path = pathinfo.path
   let self.site = a:site
   let self.path = split(pathinfo.path, '/')
   let self.type =
@@ -260,6 +260,7 @@ function! s:UI.update_issue_list()
   endfor
 endfunction
 
+" @vimlint(EVL102, 1, l:path)
 function! s:UI.open(...)
   let base = [self.site, self.name, self.issues.user, self.issues.repos]
 
@@ -270,6 +271,7 @@ function! s:UI.open(...)
   let opener = edit || &l:filetype !=# 'gitlab-issues' ? 'new' : 'edit'
   execute opener '`=path`'
 endfunction
+" @vimlint(EVL102, 0, l:path)
 
 function! s:UI.updated()
   if self.type ==# 'view' && self.mode ==# 'list'
@@ -558,16 +560,16 @@ function! gitlab#issues#new()
   return copy(s:UI)
 endfunction
 
-function! gitlab#issues#complete(lead, cmd, pos)
-  let token = split(a:cmd, '\s\+')
-  let ntoken = len(token)
-  if ntoken == 2
-    let res = gitlab#connect('/repos', 'show', g:gitlab#user)
-    return map(res.repositories, 'v:val.name')
-  else
-    return []
-  endif
-endfunction
+" function! gitlab#issues#complete(lead, cmd, pos)"{{{
+"   let token = split(a:cmd, '\s\+')
+"   let ntoken = len(token)
+"   if ntoken == 2
+"     let res = gitlab#connect('/repos', 'show', g:gitlab#user)
+"     return map(res.repositories, 'v:val.name')
+"   else
+"     return []
+"   endif
+" endfunction"}}}
 
 
 let &cpo = s:save_cpo
