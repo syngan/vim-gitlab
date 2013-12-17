@@ -420,7 +420,6 @@ function! s:UI.perform(button)
     if button ==# '[[POST]]'
       let c = getpos('.')
       try
-        1
         let bodystart = search('^\cbody:', 'n')
         if !bodystart
           throw 'gitlab: issues: No body.'
@@ -466,7 +465,6 @@ function! s:UI.perform(button)
     if button ==# '[[POST]]'
       let c = getpos('.')
       try
-        1
         let commentstart = search('^\ccomment:', 'n')
         if !commentstart
           throw 'gitlab: issues: No comment.'
