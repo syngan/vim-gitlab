@@ -13,6 +13,7 @@
 " 行    3:
 " E605: 例外が捕捉されませんでした: unknown issue #10
 "
+"
 
 let s:save_cpo = &cpo
 set cpo&vim
@@ -36,7 +37,6 @@ function! s:Issues.getidx(number)
   while left <= right
     let mid = (left + right) / 2
     " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
-    call vimconsole#log("get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id)
     if self.issues[mid].iid > a:number
       let left = mid + 1
     elseif self.issues[mid].iid < a:number
@@ -51,10 +51,6 @@ endfunction
 function! s:Issues.get(number)
   let idx = self.getidx(a:number)
   if idx < 0
-    for i in range(len(self.issues))
-      call vimconsole#log("issue[" . i . "]=" . self.issues[i].iid)
-    endfor
-
     throw "unknown issue #" . a:number . " /" . len(self.issues)
   endif
   return self.issues[idx]
