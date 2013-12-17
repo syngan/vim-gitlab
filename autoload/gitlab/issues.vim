@@ -7,21 +7,13 @@
 " Author : thinca <thinca+vim@gmail.com>
 " License: zlib License
 
-
-" vim
-" function gitlab#read..180..171..158..150 の処理中にエラーが検出されました:                                                                                       
-" 行    3:
-" E605: 例外が捕捉されませんでした: unknown issue #10
-"
-"
-
 let s:save_cpo = &cpo
 set cpo&vim
 
 " Keep the issues.
 let s:repos = {}
 
-" Issues object  {{{1
+" Issues object " {{{
 let s:Issues = gitlab#base()
 let s:Issues.name = 'issues'
 
@@ -36,7 +28,7 @@ function! s:Issues.getidx(number)
   let right = len(self.issues) - 1
   while left <= right
     let mid = (left + right) / 2
-    " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].id
+    " echomsg "get(" . a:number . ") :" . left . "," . mid . "," . right . " : " . self.issues[mid].iid
     if self.issues[mid].iid > a:number
       let left = mid + 1
     elseif self.issues[mid].iid < a:number
@@ -51,6 +43,9 @@ endfunction
 function! s:Issues.get(number)
   let idx = self.getidx(a:number)
   if idx < 0
+    " for c in range(len(self.issues))
+    "   echomsg "issues[" . c . "]=" . self.issues[c].iid
+    " endfor
     throw "unknown issue #" . a:number . " /" . len(self.issues)
   endif
   return self.issues[idx]
@@ -95,6 +90,8 @@ function! s:Issues.create_new_issue(title, body)
   let param = {'title' : a:title, 'description' : a:body}
   let issue = self.connect('POST', path, param, 0)[0]
   call add(self.issues, s:normalize_issue(issue))
+  let self.issues = sort(self.issues, s:func('order_by_number'))
+
   return issue
 endfunction
 
@@ -229,9 +226,9 @@ function! s:get_issue(site, user, repos)
   endif
   return s:repos[key]
 endfunction
+ " }}}
 
-
-" UI object  {{{1
+" UI object " {{{
 let s:UI = {'name': 'issues'}
 
 function! s:UI.initialize(site, path)
@@ -375,9 +372,9 @@ function! s:UI.issue_layout(issue)
 
   return lines
 endfunction
+ " }}}
 
-
-" Control.  {{{1
+" Control. " {{{
 function! s:UI.action()
   try
     call self.perform(gitlab#get_text_on_cursor('\[\[.\{-}\]\]'))
@@ -539,9 +536,9 @@ function! s:UI.invoke(site, args)
   let ui.site = a:site
   call ui.open(path[2 :])
 endfunction
+ " }}}
 
-
-" Misc.  {{{1
+" Misc.  " {{{
 function! s:order_by_number(a, b)
   return a:b.id - a:a.id
 endfunction
@@ -571,6 +568,8 @@ function! gitlab#issues#new()
   return copy(s:UI)
 endfunction
 
+" }}}
+
 " function! gitlab#issues#complete(lead, cmd, pos)"{{{
 "   let token = split(a:cmd, '\s\+')
 "   let ntoken = len(token)
@@ -581,7 +580,6 @@ endfunction
 "     return []
 "   endif
 " endfunction"}}}
-
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
