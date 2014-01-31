@@ -1,4 +1,3 @@
-" 日本語ファイル
 scriptencoding utf-8
 
 let s:save_cpo = &cpo
@@ -100,7 +99,7 @@ function! gitlabapi#connect(session, method, url, data) " {{{
   let a:data.private_token = a:session.token
   let headers = {}
 
-  call vimconsole#log("gitlabapi#connect: url=" . a:url)
+"  call vimconsole#log("gitlabapi#connect: url=" . a:url)
 
   if a:method == 'GET'
     let ret = s:HTTP.get(url, a:data, headers)
