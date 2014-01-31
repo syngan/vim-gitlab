@@ -80,7 +80,7 @@ function! s:Issues.update_list()
   let self.issues = sort(open, s:func('order_by_number'))
 endfunction
 
-function! s:Issues.create_new_issue(title, body)
+function! s:Issues.create_new_issue(title, body, labels)
    " title (required) - The title of an issue
    " description (optional) - The description of an issue
    " assignee_id (optional) - The ID of a user to assign issue
@@ -88,6 +88,9 @@ function! s:Issues.create_new_issue(title, body)
    " labels (optional) - Comma-separated label names for an issue
   let path = "/projects/:id/issues"
   let param = {'title' : a:title, 'description' : a:body}
+  if len(a:labels) > 0
+    let param.labels = a:labels
+  endif
   let issue = self.connect('POST', path, param, 0)[0]
   call add(self.issues, s:normalize_issue(issue))
   let self.issues = sort(self.issues, s:func('order_by_number'))
@@ -95,11 +98,14 @@ function! s:Issues.create_new_issue(title, body)
   return issue
 endfunction
 
-function! s:Issues.update_issue(number, title, body)
+function! s:Issues.update_issue(number, title, body, labels)
   " number: issue #ID: iid
   let issue = self.get(a:number)
   let path = "/projects/:id/issues/" . issue.id
   let param = {'title' : a:title, 'description' : a:body}
+  if len(a:labels) > 0
+    let param.labels = a:labels
+  endif
   let resp = self.connect('PUT', path, param, 0)[0]
   let resp.comments = self.get(a:number).comments
 "  let self.get(a:number) = res
@@ -126,34 +132,6 @@ function! s:Issues.fetch_comments(number, ...)
   endif
 endfunction
 
-function! s:Issues.add_labels(label, number)
-  return self.update_labels(a:label, a:number, 'add')
-endfunction
-
-function! s:Issues.remove_labels(label, number)
-  return self.update_labels(a:label, a:number, 'remove')
-endfunction
-
-function! s:Issues.update_labels(label, number, ...)
-  " op = 'add'/'remove'/'all'
-  let op = a:0 ? a:1 : 'all'
-  if op ==# 'all'
-    let current_labels = self.get(a:number).labels
-    let adds = s:list_sub(a:label, current_labels)
-    let removes = s:list_sub(current_labels, a:label)
-    call self.add_labels(adds, a:number)
-    call self.remove_labels(removes, a:number)
-  else
-    for l in type(a:label) == type([]) ? a:label : [a:label]
-      let args = ['label/' . op, l] + (a:number != 0 ? [a:number] : [])
-      let new_labels = call(self.connect, args, self)
-    endfor
-    if a:number != 0 && exists('new_labels')
-      let target = self.get(a:number)
-      let target.labels = new_labels.labels
-    endif
-  endif
-endfunction
 
 function! s:Issues.close(number)
   let issue = self.get(a:number)
@@ -321,7 +299,7 @@ function! s:UI.edit_issue()
     let text += ['number: ' . self.number]
   endif
   let text += ['title: ' . title]
-  call add(text, 'labels: ' . join(map(copy(labels), 'v:val.name'), ', '))
+  call add(text, 'labels: ' . join(labels, ', '))
   return text + ['body:'] + split(body, '\r\?\n', 1)
 endfunction
 
@@ -342,7 +320,7 @@ function! s:UI.issue_layout(issue)
   let lines = [
   \ i.iid . ': ' . i.title,
   \ 'user: ' . i.author.username,
-  \ 'labels: ' . join(map(copy(i.labels), 'v:val.name'), ', '),
+  \ 'labels: ' . join(i.labels, ', '),
   \ 'created: ' . i.created_at,
   \ ]
 
@@ -433,21 +411,19 @@ function! s:UI.perform(button)
           let labels = filter(split(matchstr(getline(labelsline),
           \                   '^\w\+:\s*\zs.\{-}\ze\s*$'), '\s*,\s*'),
           \                   'v:val !~ "^\\s*$"')
+        else
+          let labels = []
         endif
 
         let numberline = search('^\cnumber:', 'Wn', bodystart)
         if numberline
           let number = matchstr(getline(numberline),
           \                     '^\w\+:\s*\zs.\{-}\ze\s*$')
-          call self.issues.update_issue(number, title, body)
+          call self.issues.update_issue(number, title, body, labels)
 
         else
-          let issue = self.issues.create_new_issue(title, body)
+          let issue = self.issues.create_new_issue(title, body, labels)
           let number = issue.iid
-        endif
-
-        if exists('labels')
-          call self.issues.update_labels(labels, number)
         endif
 
       finally
