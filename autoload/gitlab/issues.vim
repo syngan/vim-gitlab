@@ -500,7 +500,7 @@ function! s:UI.reload()
     call self.open()
   elseif self.mode ==# 'issue' && self.type ==# 'view'
     let self.issue.comments = 0
-    call self.open(self.issue.id)
+    call self.open(self.issue.iid)
   endif
 endfunction
 
