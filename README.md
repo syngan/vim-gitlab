@@ -8,10 +8,27 @@ vim-gitlab is a vim client for GitLab
 
 GitLab を vim から参照・変更するプラグインです.
 - 現状 issues のみに対応
-- GitLab は 6-1-stable 以下でも動作しますが `issue #x` の数字と表示される数値が一致しません.
+- GitLab は 6-1-stable 以下でも動作しますが Web ブラウザで表示した時の `issue #x` の数字と, gitlab.vim で表示される数値が一致しません.
 (API が対応していないため)
     - c.f. https://github.com/gitlabhq/gitlabhq/commit/02693b72a4240a9d94246e590775a66eb48c55ed
-- thinca さんの vim-github を元にコピー＆修正で作成しています. 
+    - https://github.com/gitlabhq/gitlabhq/tree/master/doc/api
+
+> ## id vs iid
+>
+> When you work with API you may notice two similar fields in api entites: id and iid.
+> The main difference between them is scope. Example:
+>
+> Issue
+>   id: 46
+>   iid: 5
+>
+>   * id - is uniq across all Issues table. It used for any api calls.
+>   * iid - is uniq only in scope of single project. When you browse issues or merge requests with Web UI - you see iid.
+>
+>   So if you want to get issue with api you use `http://host/api/v3/.../issues/:id.json`
+>   But when you want to create a link to web page - use  `http:://host/project/issues/:iid.json`
+
+- thinca さんの vim-github を元にコピー＆修正で作成しています.
 
 # Install
 
@@ -21,7 +38,7 @@ NeoBundleLazy 'syngan/vim-gitlab', {
     \ 'commands' : 'Gitlab'}}
 ```
 
-- required 
+- required
     - GitLab 6-2-stable
     - `+python` or `curl` or `wget` (`vital.vim` の `Web.HTTP` に依存)
 
@@ -39,10 +56,10 @@ NeoBundleLazy 'syngan/vim-gitlab', {
 
 ```vim
 g:gitlab_config['__name__'] = {
-\	'url' : 'http://localhost/',
-\	'user' : '',
-\	'email' : 'admin@local.host',
-\	'password' : 'optional',
+\    'url' : 'http://localhost/',
+\    'user' : '',
+\    'email' : 'admin@local.host',
+\    'password' : 'optional',
 \}
 ```
 # Usage
