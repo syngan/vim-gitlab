@@ -113,14 +113,32 @@ function! s:Issues.update_issue(number, title, body, labels)
   call self.set(a:number, resp)
 endfunction
 
-function! s:Issues.add_comment(number, comment)
+function! s:Issues.get_comment(number, id)
   let issue = self.get(a:number)
-  let path = "/projects/:id/issues/" . issue.id . "/notes"
-  let param = {'body' : a:comment}
-  let comment = self.connect('POST', path, param, 0)[0]
-  call add(self.get(a:number).comments, comment)
+  let path = "/projects/:id/issues/" . issue.id . "/notes/" . a:id
+  let param = {}
+  let comment = self.connect('GET', path, param, 0)[0]
+  if type(comment) == type([])
+    return comment[0].body
+  else
+    return comment.body
+  endif
 endfunction
 
+function! s:Issues.add_comment(number, id, comment)
+  let issue = self.get(a:number)
+  let path = "/projects/:id/issues/" . issue.id . "/notes"
+  if a:id !=# 'new'
+    let path .= '/' . a:id
+  endif
+  let param = {'body' : a:comment}
+  let comment = self.connect('POST', path, param, 0)[0]
+  if a:id ==# 'new'
+    call add(self.get(a:number).comments, comment)
+  else
+    call self.fetch_comment(a:number, 1)
+  endif
+endfunction
 
 function! s:Issues.fetch_comments(number, ...)
   let issue = self.get(a:number)
@@ -242,7 +260,7 @@ function! s:UI.update_issue_list()
   let self.issue_list = list
   let length = len(self.issue_list)
   let self.rev_index = {}
-  " issues ID $B$G(B index
+  " issues ID で index
   for i in range(length)
     let self.rev_index[list[i].iid] = i
   endfor
@@ -304,7 +322,17 @@ function! s:UI.edit_issue()
 endfunction
 
 function! s:UI.edit_comment()
-  return ['[[POST]]', 'number: ' . self.number, 'comment:', '']
+  " path= [number, 'comment', id, 'edit']
+  if self.path[2] !=# 'new'
+    let comment = self.issues.get_comment(self.number, self.path[2])
+  else
+    let comment = ''
+  endif
+
+  return ['[[POST]]',
+        \ 'number: ' . self.number,
+        \ 'id: ' . self.path[2],
+        \ 'comment:', comment]
 endfunction
 
 function! s:UI.line_format(issue)
@@ -336,6 +364,7 @@ function! s:UI.issue_layout(issue)
 
   let lines += [''] + split(i.description, '\r\?\n') + ['', '']
 
+"  \ '  ' . c.author.username . ' ' . c.created_at . ' [[EditNote' . c.id . ']]',
   for c in i.comments
     let lines += [
     \ '------------------------------------------------------------',
@@ -386,6 +415,8 @@ function! s:UI.perform(button)
       call self.open(self.number)
     elseif button ==# '[[add comment]]'
       call self.open(self.number, 'comment', 'new')
+    elseif button =~# '\[\[EditNote[0-9]*\]\]'
+      echo self.open(self.number, 'comment', substitute(button, '[^0-9]', '', 'g'), 'edit')
     endif
   elseif self.mode ==# 'issue' && self.type ==# 'edit'
     if button ==# '[[POST]]'
@@ -442,7 +473,12 @@ function! s:UI.perform(button)
 
         let numberline = search('^\cnumber:', 'Wn', commentstart)
         let number = matchstr(getline(numberline), '^\w\+:\s*\zs.\{-}\ze\s*$')
-        call self.issues.add_comment(number, comment)
+
+
+        let idline = search('^\cid:', 'Wn', commentstart)
+        let id = matchstr(getline(idline), '^\w\+:\s*\zs.\{-}\ze\s*$')
+
+        call self.issues.add_comment(number, id, comment)
 
       finally
         call setpos('.', c)
@@ -486,6 +522,7 @@ function! s:UI.read()
   let cursor = getpos('.')
   setlocal modifiable noreadonly
   let name = self.type . '_' . self.mode
+"echo "UI.read(): " . name
   silent % delete _
   silent 0put =self.header()
   silent $put =self[name]()
