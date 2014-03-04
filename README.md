@@ -1,5 +1,7 @@
 # vim-gitlab
 
+[![Build Status](https://travis-ci.org/syngan/vim-alarm.png?branch=master)](https://travis-ci.org/syngan/vim-alarm)
+
 vim-gitlab is a vim client for GitLab
 
 * c.f. https://github.com/thinca/vim-github
