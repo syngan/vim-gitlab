@@ -104,7 +104,7 @@ function! s:Issues.update_issue(number, title, body, labels)
   let path = "/projects/:id/issues/" . issue.id
   let param = {'title' : a:title, 'description' : a:body}
   if len(a:labels) > 0
-    let param.labels = a:labels
+    let param.labels = join(a:labels, ',')
   endif
   let resp = self.connect('PUT', path, param, 0)[0]
   let resp.comments = self.get(a:number).comments
