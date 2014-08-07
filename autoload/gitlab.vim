@@ -271,53 +271,6 @@ function! s:iconv(expr, from, to)
   return result != '' ? result : a:expr
 endfunction
 
-function! s:system(args)
-  let type = type(a:args)
-  let args = type == type([]) ? a:args :
-  \          type == type('') ? split(a:args) : []
-
-  if g:gitlab#use_vimproc
-    call gitlab#debug_log(args)
-    return vimproc#system(args)
-  endif
-
-  if s:is_win
-    let args[0] = s:cmdpath(args[0])
-    let q = '"'
-    let cmd = join(map(args,
-    \   'q . substitute(escape(v:val, q), "[<>^|&]", "^\\0", "g") . q'),
-    \   ' ')
-  else
-    let cmd = join(map(args, 'shellescape(v:val)'), ' ')
-  endif
-  call gitlab#debug_log(cmd)
-  return system(cmd)
-endfunction
-
-function! s:cmdpath(cmd)
-  " Search the fullpath of command for MS Windows.
-  let full = glob(a:cmd)
-  if a:cmd ==? full
-    " Already fullpath.
-    return a:cmd
-  endif
-
-  let extlist = split($PATHEXT, ';')
-  if a:cmd =~? '\V\%(' . substitute($PATHEXT, ';', '\\|', 'g') . '\)\$'
-    call insert(extlist, '', 0)
-  endif
-  for dir in split($PATH, ';')
-    for ext in extlist
-      let full = glob(dir . '\' . a:cmd . ext)
-      if full != ''
-        return full
-      endif
-    endfor
-  endfor
-  return ''
-endfunction
-
-
 " Debug.  {{{1
 function! gitlab#debug_log(mes, ...)
   if !g:gitlab#debug
