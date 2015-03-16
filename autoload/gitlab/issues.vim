@@ -289,7 +289,7 @@ function! s:UI.updated()
 endfunction
 
 function! s:UI.header()
-  return printf('Github Issues - %s/%s', self.issues.user, self.issues.repos)
+  return printf('Gitlab Issues - %s/%s', self.issues.user, self.issues.repos)
 endfunction
 
 function! s:UI.view_list()
